@@ -114,7 +114,7 @@ func handleError(err error, w http.ResponseWriter) bool {
 func main() {
 	// send the third line of the most recent EMVTERM file
 	http.HandleFunc("/terminalId", func(clientResponse http.ResponseWriter, clientRequest *http.Request) {
-		terminalId, err := extractTerminalId("./EMV_Files/", ".EMVTERM")
+		terminalId, err := extractTerminalId("C:/Shift4/EMV/", ".EMVTERM")
 		if handleError(err, clientResponse) {
 			return
 		}
