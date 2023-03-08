@@ -122,11 +122,10 @@ func main() {
 	})
 
 	http.HandleFunc("/", corsProxy)
-
 	// TODO: parameterize listen
 	// start the HTTP server and handle errors (usually invalid listening address)
-	// if err := http.ListenAndServe(":4040", nil); err != nil {
-	if err := http.ListenAndServe("localhost:4040", nil); err != nil {
+	if err := http.ListenAndServe(":4040", nil); err != nil {
+		// if err := http.ListenAndServe("localhost:4040", nil); err != nil {
 		log.Fatal(err)
 	}
 }
