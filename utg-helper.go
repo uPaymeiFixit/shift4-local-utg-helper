@@ -103,7 +103,7 @@ func copyHeaders(dst http.Header, src http.Header) {
 
 func handleError(err error, w http.ResponseWriter) bool {
 	if err != nil {
-		log.Printf("ERROR: %v", err)
+		elog.Info(eventid, fmt.Sprintf("ERROR: %v", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return true
@@ -126,6 +126,7 @@ func startServer() {
 	// start the HTTP server and handle errors (usually invalid listening address)
 	if err := http.ListenAndServe(":4040", nil); err != nil {
 		// if err := http.ListenAndServe("localhost:4040", nil); err != nil {
+		elog.Error(eventid, fmt.Sprintf("%s encountered an unrecoverable error: %v", svcName, err))
 		log.Fatal(err)
 	}
 }
