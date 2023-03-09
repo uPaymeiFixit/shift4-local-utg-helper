@@ -4,18 +4,21 @@ import (
 	"fmt"
 
 	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 )
 
-var elog debug.Log
+const svcName = "Shift4 UTG Helper"
+const eventid uint32 = 44227
 
-type myservice struct{}
+var elog *eventlog.Log
 
-func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+type winservice struct{}
+
+func (m *winservice) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+
 loop:
 	for {
 		select {
@@ -25,39 +28,36 @@ loop:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				changes <- svc.Status{State: svc.StopPending}
-				elog.Info(1, fmt.Sprintf("%s service stopped", "Shift4 UTG Helper FROMLOG"))
+				elog.Info(eventid, fmt.Sprintf("%s service stopped", svcName))
 				break loop
+			default:
+				elog.Error(eventid, fmt.Sprintf("Unexpected control request #%d", c))
 			}
 		}
 	}
 
-	return false, 0
-
+	return
 }
 
-func runService(name string, isDebug bool) {
-	var err error
-	elog, err = eventlog.Open(name)
-	if err != nil {
+func runService() {
+	elog.Info(eventid, fmt.Sprintf("Starting %s service.", svcName))
+
+	if err := svc.Run(svcName, &winservice{}); err != nil {
+		elog.Error(eventid, fmt.Sprintf("%s service failed: %v", svcName, err))
 		return
 	}
+
+	elog.Info(eventid, fmt.Sprintf("%s service stopped.", svcName))
+}
+
+func main() {
+	elog, _ = eventlog.Open(svcName)
 	defer elog.Close()
 
-	elog.Info(1, fmt.Sprintf("starting %s service", name))
-	run := svc.Run
-	err = run(name, &myservice{})
-	if err != nil {
-		elog.Error(1, fmt.Sprintf("%s service failed: %v", name, err))
-		return
-	}
+	// TODO: check if we're running in a service
+	// TODO: install
+	// TODO: get arguments
 
-	elog.Info(1, fmt.Sprintf("%s service stopped", name))
-}
-
-func init() {
-	elog, _ = eventlog.Open("Shift4 UTG Helper EVENTLOG")
-	elog.Error(1, fmt.Sprintf("where does this log go?"))
-
-	// runService("what is this?", true)
-	go svc.Run("Shift4 UTG Helper RUN", &myservice{})
+	runService()
+	go startServer()
 }
