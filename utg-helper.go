@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -10,6 +11,11 @@ import (
 	"sort"
 	"strings"
 )
+
+var originURL string = "*"
+var utgBaseURL string = "https://10.0.15.19:4041"
+var listenAddr string = "localhost:4040"
+var utgInstallDir string = "C:\\Shift4\\"
 
 func extractTerminalId(dir string, ext string) (string, error) {
 	// get an array of files in our specified directory, and handle errors
@@ -52,10 +58,8 @@ func extractTerminalId(dir string, ext string) (string, error) {
 }
 
 func corsProxy(clientResponse http.ResponseWriter, clientRequest *http.Request) {
-	// TODO: parameterize origin
 	// attach CORS headers to client response
-	// clientResponse.Header().Add("Access-Control-Allow-Origin", "http://localhost:3210")
-	clientResponse.Header().Add("Access-Control-Allow-Origin", "*")
+	clientResponse.Header().Add("Access-Control-Allow-Origin", originURL)
 
 	// respond to preflight request by allowing all methods and headers
 	if clientRequest.Method == "OPTIONS" {
@@ -64,9 +68,8 @@ func corsProxy(clientResponse http.ResponseWriter, clientRequest *http.Request) 
 		return
 	}
 
-	// TODO: parameterize src
 	// create the request to UTG server, and handle errors
-	utgRequest, err := http.NewRequest(clientRequest.Method, "https://10.0.15.19:4041/api/rest/v1/transactions/sale", clientRequest.Body)
+	utgRequest, err := http.NewRequest(clientRequest.Method, utgBaseURL+clientRequest.URL.String(), clientRequest.Body)
 	if handleError(err, clientResponse) {
 		return
 	}
@@ -103,6 +106,7 @@ func copyHeaders(dst http.Header, src http.Header) {
 
 func handleError(err error, w http.ResponseWriter) bool {
 	if err != nil {
+		log.Printf("ERROR: %v", err)
 		elog.Info(eventid, fmt.Sprintf("ERROR: %v", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -111,10 +115,14 @@ func handleError(err error, w http.ResponseWriter) bool {
 	return false
 }
 
+// func startServer(listenAddr string, utgBaseUrl string, originUrl string) {
 func startServer() {
+	getFlags()
+
 	// send the third line of the most recent EMVTERM file
+	log.Printf("Serving UTG's currently configured terminal ID on http://%s/terminalId", listenAddr)
 	http.HandleFunc("/terminalId", func(clientResponse http.ResponseWriter, clientRequest *http.Request) {
-		terminalId, err := extractTerminalId("C:/Shift4/EMV/", ".EMVTERM")
+		terminalId, err := extractTerminalId(utgInstallDir+"EMV\\", ".EMVTERM")
 		if handleError(err, clientResponse) {
 			return
 		}
@@ -122,11 +130,22 @@ func startServer() {
 	})
 
 	http.HandleFunc("/", corsProxy)
-	// TODO: parameterize listen
 	// start the HTTP server and handle errors (usually invalid listening address)
-	if err := http.ListenAndServe(":4040", nil); err != nil {
-		// if err := http.ListenAndServe("localhost:4040", nil); err != nil {
+	log.Printf("Forwarding calls originating from %s through http://%s to %s", originURL, listenAddr, utgBaseURL)
+	if err := http.ListenAndServe(listenAddr, nil); err != nil {
 		elog.Error(eventid, fmt.Sprintf("%s encountered an unrecoverable error: %v", svcName, err))
 		log.Fatal(err)
 	}
 }
+
+func getFlags() {
+	flag.StringVar(&listenAddr, "listenAddr", listenAddr, "host:port this server should listen on. e.g :4040 or localhost:8080")
+	flag.StringVar(&utgBaseURL, "utgBaseURL", utgBaseURL, "The base URL the Shift4 UTG server is running on. e.g. https://localhost:4041")
+	flag.StringVar(&originURL, "originURL", originURL, "URL your browser will be calling from to allow CORS. e.g. https://mywebsite.com or *")
+	flag.StringVar(&utgInstallDir, "utgInstallDir", utgInstallDir, "Directory Shift4's UTG software is installed in. Usually C:/Shift4/")
+	flag.Parse()
+}
+
+// Install this service with:
+// SC CREATE "Shift4 UTG Helper" binpath="C:\Shift4 Helper\utg-helper.exe -listenAddr=localhost:4040 -utgBaseURL=https://localhost:4041 -originURL=*" depend="frmUtg2Service"
+// SC CREATE "Shift4 UTG Helper" binpath="C:\Shift4 Helper\utg-helper.exe" depend="frmUtg2Service"

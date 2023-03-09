@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"
@@ -54,10 +55,13 @@ func main() {
 	elog, _ = eventlog.Open(svcName)
 	defer elog.Close()
 
-	// TODO: check if we're running in a service
-	// TODO: install
-	// TODO: get arguments
+	inService, err := svc.IsWindowsService()
+	if err != nil {
+		log.Fatalf("failed to determine if we are running in service: %v", err)
+	}
+	if inService {
+		go runService()
+	}
 
-	runService()
-	go startServer()
+	startServer()
 }
