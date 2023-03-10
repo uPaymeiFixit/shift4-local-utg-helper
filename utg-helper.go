@@ -75,7 +75,7 @@ func corsProxy(clientResponse http.ResponseWriter, clientRequest *http.Request) 
 	}
 
 	// copy headers from the client request to the utg request
-	copyHeaders(clientRequest.Header, utgRequest.Header)
+	copyHeaders(utgRequest.Header, clientRequest.Header)
 
 	// make the request to the UTG server and handle errors
 	utgResponse, err := http.DefaultClient.Do(utgRequest)
