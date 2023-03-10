@@ -116,7 +116,7 @@ func handleError(err error, w http.ResponseWriter) bool {
 	return false
 }
 
-// func startServer(listenAddr string, utgBaseUrl string, originUrl string) {
+// func startServer(listenAddr string, utgBaseUrl string, originUrl string, utgInstallDir string) {
 func startServer() {
 	getFlags()
 
@@ -146,10 +146,10 @@ func startServer() {
 }
 
 func getFlags() {
-	flag.StringVar(&listenAddr, "listenAddr", listenAddr, "host:port this server should listen on. e.g :4040 or localhost:8080")
+	flag.StringVar(&listenAddr, "listenAddr", listenAddr, "host:port this server should listen on. e.g :4040")
 	flag.StringVar(&utgBaseURL, "utgBaseURL", utgBaseURL, "The base URL the Shift4 UTG server is running on. e.g. https://localhost:4041")
-	flag.StringVar(&originURL, "originURL", originURL, "URL your browser will be calling from to allow CORS. e.g. https://mywebsite.com or *")
-	flag.StringVar(&utgInstallDir, "utgInstallDir", utgInstallDir, "Directory Shift4's UTG software is installed in. Usually C:/Shift4/")
+	flag.StringVar(&originURL, "originURL", originURL, "URL your browser will be calling from to allow CORS. e.g. https://mywebsite.com")
+	flag.StringVar(&utgInstallDir, "utgInstallDir", utgInstallDir, "Directory Shift4's UTG software is installed in.")
 	flag.Parse()
 }
 
