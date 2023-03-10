@@ -13,7 +13,7 @@ import (
 )
 
 var originURL string = "*"
-var utgBaseURL string = "https://10.0.15.19:4041"
+var utgBaseURL string = "https://localhost:4041"
 var listenAddr string = "localhost:4040"
 var utgInstallDir string = "C:\\Shift4\\"
 
