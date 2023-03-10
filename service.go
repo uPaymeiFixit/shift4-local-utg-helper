@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 const svcName = "Shift4 UTG Helper"
@@ -166,4 +167,37 @@ func copyFile(src string, dest string) (err error) {
 	}
 
 	return nil
+}
+
+func uninstallSvc() error {
+	fmt.Print("Uninstalling Shift4 UTG Helper...")
+
+	err := os.RemoveAll("C:\\Program Files\\Shift4 Helper")
+
+	m, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer m.Disconnect()
+	s, err := m.OpenService(svcName)
+	if err != nil {
+		return err
+		// return fmt.Errorf("%s service is not installed", svcName)
+	}
+	defer s.Close()
+	err = s.Delete()
+	if err != nil {
+		return err
+	}
+	err = eventlog.Remove(svcName)
+	if err != nil {
+		return err
+		// return fmt.Errorf("RemoveEventLogSource() failed: %s", err)
+	}
+
+	fmt.Println("Done")
+
+	fmt.Println("Please reboot for changes to take effect")
+
+	return err
 }
