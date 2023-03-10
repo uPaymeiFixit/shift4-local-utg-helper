@@ -65,11 +65,80 @@ func main() {
 		log.Fatalf("failed to determine if we are running in service: %v", err)
 	}
 	if inService {
+		// TODO: Fix, this doesn't shut down when the service stops
 		go runService()
+	} else {
+		handleInput()
 	}
 
 	startServer()
 }
+
+func handleInput() {
+	cmd := ""
+	if len(os.Args) >= 2 {
+		cmd = strings.ToLower(os.Args[1])
+	}
+	switch cmd {
+	case "install":
+		err := installSvc()
+		if err != nil {
+			log.Fatalf("\nERROR: %v", err)
+		}
+	case "uninstall":
+		err := uninstallSvc()
+		if err != nil {
+			fmt.Printf("\nERROR: %v", err)
+			// log.Fatalf("\nERROR: %v", err)
+		}
+	case "run", "start":
+		return
+	case "":
+		fmt.Println("no arguments provided, starting menu")
+	default:
+		// Do nothing. Unrecognized args will be handled by the flag library in startServer
+		return
+
+	}
+
+	fmt.Println("Welcome to the Shift4 UTG Helper menu.")
+	fmt.Println("In the future, you can skip straight to running the service by\nproviding parameters or running with the \"start\" argument.")
+	fmt.Println("For a list of available parameters and their default values,\nrun this program with the \"-help\" argument.\n")
+	fmt.Println("Select an action:")
+	fmt.Println("\t1. Install")
+	fmt.Println("\t2. Uninstall")
+	fmt.Println("\t3. Start (using default parameters)")
+	fmt.Println("\t4. Exit")
+	var selection int
+	for {
+		fmt.Print("Selection [1-4]: ")
+		fmt.Scan(&selection)
+		if selection >= 1 && selection <= 4 {
+			break
+		}
+		fmt.Printf("%d is not a value between 1 and 4. Try again.\n", selection)
+	}
+
+	switch selection {
+	case 1:
+		err := installSvc()
+		if err != nil {
+			fmt.Printf("\nERROR: %v", err)
+			// log.Fatalf("\nERROR: %v", err)
+		}
+	case 2:
+		err := uninstallSvc()
+		if err != nil {
+			fmt.Printf("\nERROR: %v", err)
+			// log.Fatalf("\nERROR: %v", err)
+		}
+	case 3:
+		// start the server, which will be done automatically if we leave this function
+	case 4:
+		os.Exit(0)
+	}
+}
+
 func installSvc() error {
 
 	fmt.Print("Installing Shift4 UTG Helper...")
@@ -200,4 +269,9 @@ func uninstallSvc() error {
 	fmt.Println("Please reboot for changes to take effect")
 
 	return err
+}
+
+func wait() {
+	var a string
+	fmt.Scan(&a)
 }
