@@ -2,6 +2,11 @@
 
 Shift4 Local UTG Helper is installed alongside Shift4's UTG Standalone application and acts as a CORS server and terminal ID extraction utility.
 
+# build
+
+`rsrc -manifest utg-helper.exe.manifest -o utg-helper.syso`
+`GOOS=windows GOARCH=amd64 go build -o bin/utg-helper.exe`
+
 ### DEVELOPMENT STATUS
 
 - [x] Create basic executable to run the HTTP server
