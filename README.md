@@ -4,7 +4,7 @@ Shift4 Local UTG Helper is installed alongside Shift4's UTG Standalone applicati
 
 # build
 
-`rsrc -manifest utg-helper.exe.manifest -o utg-helper.syso`
+`rsrc -manifest utg-helper.exe.manifest -ico icon.ico -o utg-helper.syso`
 `GOOS=windows GOARCH=amd64 go build -o bin/utg-helper.exe`
 
 ### DEVELOPMENT STATUS
