@@ -132,6 +132,7 @@ func startServer() {
 		if handleError(err, clientResponse) {
 			return
 		}
+		clientResponse.Header().Add("Access-Control-Allow-Origin", originURL)
 		clientResponse.Write([]byte(terminalId))
 	})
 
