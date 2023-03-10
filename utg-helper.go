@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -118,6 +119,11 @@ func handleError(err error, w http.ResponseWriter) bool {
 // func startServer(listenAddr string, utgBaseUrl string, originUrl string) {
 func startServer() {
 	getFlags()
+
+	// TODO: we should not do this in production
+	http.DefaultClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 
 	// send the third line of the most recent EMVTERM file
 	log.Printf("Serving UTG's currently configured terminal ID on http://%s/terminalId", listenAddr)
