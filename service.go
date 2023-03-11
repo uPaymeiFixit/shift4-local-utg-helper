@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/windows/svc"
@@ -17,12 +18,52 @@ import (
 const svcName = "Shift4 UTG Helper"
 const eventid uint32 = 44227
 
+var installDir = "C:\\Program Files\\Shift4 Helper"
+var serviceDependencies = []string{"frmUtg2Service"}
 var server *http.Server
 var elog *eventlog.Log
+var inService bool
 
 type winservice struct{}
 
+func main() {
+	elog, _ = eventlog.Open(svcName)
+	defer elog.Close()
+
+	// Determine whether this process is run as a Windows Service
+	var err error
+	inService, err = svc.IsWindowsService()
+	if err != nil {
+		log.Fatalf("failed to determine if we are running in service: %v", err)
+	}
+
+	if inService {
+		// Begin the Windows Service handler
+		if err := svc.Run(svcName, &winservice{}); err != nil {
+			elog.Error(eventid, fmt.Sprintf("%s service failed: %v", svcName, err))
+			return
+		}
+	} else {
+		// Start the CLI menu
+		cmd := ""
+		if len(os.Args) >= 2 {
+			cmd = strings.ToLower(os.Args[1])
+		}
+
+		if cmd == "" {
+			fmt.Println("Welcome to the Shift4 UTG Helper menu.\n")
+			fmt.Println("In the future, you can skip the menu by including \na \"start\", \"install\", or \"uninstall\" argument.")
+			fmt.Println("For a list of additional parameters and their default values,\nrun this program with the \"-help\" argument.")
+		}
+
+		handleInput(cmd)
+	}
+}
+
+// This function will be called by the Windows Service handler
 func (m *winservice) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+	elog.Info(eventid, fmt.Sprintf("Starting %s service", svcName))
+	server = utgHelper()
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
@@ -36,6 +77,7 @@ loop:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				changes <- svc.Status{State: svc.StopPending}
+				// Attempt to gracefully shut down the HTTP server
 				server.Shutdown(context.Background())
 				elog.Info(eventid, fmt.Sprintf("%s service stopped", svcName))
 				break loop
@@ -48,68 +90,33 @@ loop:
 	return
 }
 
-func runService() {
-	elog.Info(eventid, fmt.Sprintf("Starting %s service.", svcName))
-
-	server = startServer()
-
-	if err := svc.Run(svcName, &winservice{}); err != nil {
-		elog.Error(eventid, fmt.Sprintf("%s service failed: %v", svcName, err))
-		return
-	}
-
-	elog.Info(eventid, fmt.Sprintf("%s service stopped.", svcName))
-}
-
-func main() {
-	elog, _ = eventlog.Open(svcName)
-	defer elog.Close()
-
-	inService, err := svc.IsWindowsService()
-	if err != nil {
-		log.Fatalf("failed to determine if we are running in service: %v", err)
-	}
-
-	if inService {
-		runService()
-	} else {
-		handleInput()
-	}
-
-	server = startServer()
-}
-
-func handleInput() {
-	cmd := ""
-	if len(os.Args) >= 2 {
-		cmd = strings.ToLower(os.Args[1])
-	}
+// CLI menu loop
+func handleInput(cmd string) {
+	// Handle both numeric user inputs and executable arguments
 	switch cmd {
-	case "install":
+	case "1", "install":
 		err := installSvc()
 		if err != nil {
-			log.Fatalf("\nERROR: %v", err)
+			fmt.Printf("Error\n  %v\n", err)
 		}
-	case "uninstall":
+	case "2", "uninstall":
 		err := uninstallSvc()
 		if err != nil {
-			fmt.Printf("\nERROR: %v", err)
-			// log.Fatalf("\nERROR: %v", err)
+			fmt.Printf("Error\n  %v\n", err)
 		}
-	case "run", "start":
-		return
 	case "":
-		fmt.Println("no arguments provided, starting menu")
+		// This case will only be valid when the user does not provide any arguments during launch
+		break
+	case "4":
+		os.Exit(0)
 	default:
-		// Do nothing. Unrecognized args will be handled by the flag library in startServer
-		return
-
+		// During our CLI control loop, this can only be 3
+		// At startup we will start the server if the user provides arguments
+		utgHelper()
 	}
 
-	fmt.Println("Welcome to the Shift4 UTG Helper menu.")
-	fmt.Println("In the future, you can skip straight to running the service by\nproviding parameters or running with the \"start\" argument.")
-	fmt.Println("For a list of available parameters and their default values,\nrun this program with the \"-help\" argument.\n")
-	fmt.Println("Select an action:")
+	// Print the menu
+	fmt.Println("\nSelect an action:")
 	fmt.Println("\t1. Install")
 	fmt.Println("\t2. Uninstall")
 	fmt.Println("\t3. Start (using default parameters)")
@@ -124,39 +131,28 @@ func handleInput() {
 		fmt.Printf("%d is not a value between 1 and 4. Try again.\n", selection)
 	}
 
-	switch selection {
-	case 1:
-		err := installSvc()
-		if err != nil {
-			fmt.Printf("\nERROR: %v", err)
-			// log.Fatalf("\nERROR: %v", err)
-		}
-	case 2:
-		err := uninstallSvc()
-		if err != nil {
-			fmt.Printf("\nERROR: %v", err)
-			// log.Fatalf("\nERROR: %v", err)
-		}
-	case 3:
-		// start the server, which will be done automatically if we leave this function
-	case 4:
-		os.Exit(0)
-	}
+	fmt.Println()
+	handleInput(strconv.Itoa(selection))
 }
 
+// Copy this executable to Program Files and add as a service
 func installSvc() error {
-
 	fmt.Print("Installing Shift4 UTG Helper...")
 
-	exepath, err := os.Executable()
+	// Get the path of the current executable to be copied
+	exePath, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	installpath := "C:\\Program Files\\Shift4 Helper\\utg-helper.exe"
-	err = copyFile(exepath, installpath)
+
+	// Copy this file to installExePath
+	installExePath := installDir + "\\utg-helper.exe"
+	err = copyFile(exePath, installExePath)
 	if err != nil {
 		return err
 	}
+
+	// Begin the process of adding the Windows Service
 	m, err := mgr.Connect()
 	if err != nil {
 		return err
@@ -167,7 +163,7 @@ func installSvc() error {
 		s.Close()
 		return fmt.Errorf("%s service already exists", svcName)
 	}
-	s, err = m.CreateService(svcName, installpath, mgr.Config{DisplayName: svcName, Dependencies: []string{"frmUtg2Service"}}, "is", "auto-started")
+	s, err = m.CreateService(svcName, installExePath, mgr.Config{DisplayName: svcName, Dependencies: serviceDependencies}, "is", "auto-started")
 	if err != nil {
 		return err
 	}
@@ -181,15 +177,12 @@ func installSvc() error {
 	fmt.Println("Done")
 	fmt.Printf("\nTo configure the service, open services.msc and navigate to \"%s\".  ", svcName)
 
-	// Keep the window open so the user can read
-	wait()
-	os.Exit(0)
 	return nil
 }
 
-func copyFile(src string, dest string) (err error) {
-	path := "C:\\Program Files\\Shift4 Helper"
-	os.Mkdir(path, os.ModePerm)
+// A simple function that copies files from src to dst and creates directories along the way
+func copyFile(src string, dst string) (err error) {
+	os.MkdirAll(installDir, os.ModePerm)
 
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -197,7 +190,7 @@ func copyFile(src string, dest string) (err error) {
 	}
 	defer srcFile.Close()
 
-	destFile, err := os.Create(dest)
+	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
@@ -216,11 +209,14 @@ func copyFile(src string, dest string) (err error) {
 	return nil
 }
 
+// Delete the folder in Program Files and remove the Windows Service
 func uninstallSvc() error {
 	fmt.Print("Uninstalling Shift4 UTG Helper...")
 
-	err := os.RemoveAll("C:\\Program Files\\Shift4 Helper")
+	// Delete the folder and its contents
+	err := os.RemoveAll(installDir)
 
+	// Begin the process of removing the Windows Service
 	m, err := mgr.Connect()
 	if err != nil {
 		return err
@@ -229,7 +225,6 @@ func uninstallSvc() error {
 	s, err := m.OpenService(svcName)
 	if err != nil {
 		return err
-		// return fmt.Errorf("%s service is not installed", svcName)
 	}
 	defer s.Close()
 	err = s.Delete()
@@ -239,17 +234,10 @@ func uninstallSvc() error {
 	err = eventlog.Remove(svcName)
 	if err != nil {
 		return err
-		// return fmt.Errorf("RemoveEventLogSource() failed: %s", err)
 	}
 
 	fmt.Println("Done")
-
-	fmt.Println("Please reboot for changes to take effect")
+	fmt.Println("\nPlease reboot for changes to take effect")
 
 	return err
-}
-
-func wait() {
-	var a string
-	fmt.Scan(&a)
 }
