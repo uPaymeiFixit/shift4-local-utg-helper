@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/windows/svc"
@@ -68,6 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to determine if we are running in service: %v", err)
 	}
+
 	if inService {
 		runService()
 	} else {
@@ -146,7 +148,7 @@ func installSvc() error {
 
 	fmt.Print("Installing Shift4 UTG Helper...")
 
-	exepath, err := exePath()
+	exepath, err := os.Executable()
 	if err != nil {
 		return err
 	}
@@ -183,33 +185,6 @@ func installSvc() error {
 	wait()
 	os.Exit(0)
 	return nil
-}
-
-// return the path to this executable
-func exePath() (string, error) {
-	prog := os.Args[0]
-	p, err := filepath.Abs(prog)
-	if err != nil {
-		return "", err
-	}
-	fi, err := os.Stat(p)
-	if err == nil {
-		if !fi.Mode().IsDir() {
-			return p, nil
-		}
-		err = fmt.Errorf("%s is directory", p)
-	}
-	if filepath.Ext(p) == "" {
-		p += ".exe"
-		fi, err := os.Stat(p)
-		if err == nil {
-			if !fi.Mode().IsDir() {
-				return p, nil
-			}
-			err = fmt.Errorf("%s is directory", p)
-		}
-	}
-	return "", err
 }
 
 func copyFile(src string, dest string) (err error) {
