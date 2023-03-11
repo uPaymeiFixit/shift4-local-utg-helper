@@ -16,6 +16,7 @@ import (
 const svcName = "Shift4 UTG Helper"
 const eventid uint32 = 44227
 
+var server *http.Server
 var elog *eventlog.Log
 
 type winservice struct{}
@@ -34,6 +35,7 @@ loop:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				changes <- svc.Status{State: svc.StopPending}
+				server.Shutdown(context.Background())
 				elog.Info(eventid, fmt.Sprintf("%s service stopped", svcName))
 				break loop
 			default:
@@ -47,6 +49,8 @@ loop:
 
 func runService() {
 	elog.Info(eventid, fmt.Sprintf("Starting %s service.", svcName))
+
+	server = startServer()
 
 	if err := svc.Run(svcName, &winservice{}); err != nil {
 		elog.Error(eventid, fmt.Sprintf("%s service failed: %v", svcName, err))
@@ -65,13 +69,12 @@ func main() {
 		log.Fatalf("failed to determine if we are running in service: %v", err)
 	}
 	if inService {
-		// TODO: Fix, this doesn't shut down when the service stops
-		go runService()
+		runService()
 	} else {
 		handleInput()
 	}
 
-	startServer()
+	server = startServer()
 }
 
 func handleInput() {

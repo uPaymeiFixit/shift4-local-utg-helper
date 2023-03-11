@@ -117,7 +117,7 @@ func handleError(err error, w http.ResponseWriter) bool {
 }
 
 // func startServer(listenAddr string, utgBaseUrl string, originUrl string, utgInstallDir string) {
-func startServer() {
+func startServer() *http.Server {
 	getFlags()
 
 	// TODO: we should not do this in production
@@ -139,10 +139,22 @@ func startServer() {
 	http.HandleFunc("/", corsProxy)
 	// start the HTTP server and handle errors (usually invalid listening address)
 	log.Printf("Forwarding calls originating from %s through http://%s to %s", originURL, listenAddr, utgBaseURL)
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
-		elog.Error(eventid, fmt.Sprintf("%s encountered an unrecoverable error: %v", svcName, err))
-		log.Fatal(err)
-	}
+
+	server := &http.Server{Addr: listenAddr}
+
+	go func() {
+		// if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil {
+			if err == http.ErrServerClosed {
+				elog.Error(eventid, fmt.Sprintf("THE SERVER GOT THE SIGNAL TO SHUT DOWN"))
+			}
+			elog.Error(eventid, fmt.Sprintf("%s encountered an unrecoverable error: %v", svcName, err))
+			// log.Fatal(err)
+			log.Println(err)
+		}
+	}()
+
+	return server
 }
 
 func getFlags() {
