@@ -30,7 +30,7 @@ You may change default values by providing flag arguments as seen in the screens
 
 # Install
 
-To install the UTG Helper as a Windows Service, either run the utility with the `install` argument, or select option 1 in the menu. The executable will be copied to `C:\Program Files\Shift4 Helper\utg-helper.exe` and should show up in Windows' Services. After installation, it's recommended that locate it inside Windows' Services (run `services.msc`) and modify the _Startup type_ and _Start parameters_ as you see fit. You may use the same start parameters mentioned in the above **Run** section.
+To install the UTG Helper as a Windows Service, either run the utility with the `install` argument, or select option 1 in the menu. The executable will be copied to `C:\Program Files\Shift4 Helper\utg-helper.exe` and should show up in Windows' Services. After installation, it's recommended that locate it inside Windows' Services (run `services.msc`) and modify the _Startup type_ and _Recovery_ options as you see fit. Note that if you want to append start parameters such as the ones mentioned in the above **Run** section, you must [modify the registry or append them to the executable path](https://serverfault.com/questions/507561/in-a-windows-service-will-the-start-parameters-be-preserved-if-the-start-is-of).
 
 ![windows services](https://user-images.githubusercontent.com/1683528/224466483-20691850-2caf-4d51-91eb-b2776a8f9745.png)
 
